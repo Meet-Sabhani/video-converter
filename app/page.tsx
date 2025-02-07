@@ -1,101 +1,108 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect } from "react";
+import { createFFmpeg, fetchFile } from "@ffmpeg/ffmpeg";
+import vG from "../public/videos/Game-hanger.mkv";
+import { Button } from "@/components/ui/button";
+import { Select, SelectItem } from "@/components/ui/select";
+import { Card, CardContent } from "@/components/ui/card";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [convertedVideoUrl, setConvertedVideoUrl] = useState<string | null>(
+    null
+  );
+  const [ffmpeg, setFfmpeg] = useState<any>(null);
+  const [isReady, setIsReady] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [format, setFormat] = useState("mp4");
+  const [resolution, setResolution] = useState("1280:720");
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+  useEffect(() => {
+    const loadFFmpeg = async () => {
+      const ffmpegInstance = createFFmpeg({ log: true });
+      await ffmpegInstance.load();
+      setFfmpeg(ffmpegInstance);
+      setIsReady(true);
+    };
+    loadFFmpeg();
+  }, []);
+
+  const convertVideo = async () => {
+    if (!ffmpeg) return;
+    setIsProcessing(true);
+
+    ffmpeg.FS("writeFile", "input.mkv", await fetchFile(vG));
+    await ffmpeg.run(
+      "-i",
+      "input.mkv",
+      "-vf",
+      `scale=${resolution}`,
+      "-c:v",
+      "libx264",
+      "-preset",
+      "fast",
+      "-c:a",
+      "aac",
+      `output.${format}`
+    );
+
+    const data = ffmpeg.FS("readFile", `output.${format}`);
+    const videoBlob = new Blob([data.buffer], { type: `video/${format}` });
+    const url = URL.createObjectURL(videoBlob);
+    setConvertedVideoUrl(url);
+    setIsProcessing(false);
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen p-5">
+      <h1 className="text-3xl font-bold mb-5">Video Streaming & Conversion</h1>
+      <Card className="w-full max-w-md p-4">
+        <CardContent>
+          <h2 className="text-lg font-semibold mb-3">
+            Select Format & Resolution
+          </h2>
+          <Select value={format} onChange={(e) => setFormat(e?.target?.value)}>
+            <SelectItem value="mp4">MP4</SelectItem>
+            <SelectItem value="avi">AVI</SelectItem>
+            <SelectItem value="mov">MOV</SelectItem>
+          </Select>
+          <Select
+            value={resolution}
+            onChange={(e) => setResolution(e?.target?.value)}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            <SelectItem value="1920:1080">1080p (Full HD)</SelectItem>
+            <SelectItem value="1280:720">720p (HD)</SelectItem>
+            <SelectItem value="854:480">480p (SD)</SelectItem>
+          </Select>
+          <Button
+            className="mt-4 w-full"
+            onClick={convertVideo}
+            disabled={!isReady || isProcessing}
           >
-            Read our docs
+            {isProcessing ? "Processing..." : "Convert & Download"}
+          </Button>
+        </CardContent>
+      </Card>
+      {convertedVideoUrl && (
+        <div className="mt-5">
+          <video controls className="w-full max-w-md">
+            <source src={convertedVideoUrl} type={`video/${format}`} />
+            Your browser does not support the video tag.
+          </video>
+          <a
+            href={convertedVideoUrl}
+            download={`converted_video.${format}`}
+            className="block mt-3 text-blue-500 underline"
+          >
+            Download Converted Video
           </a>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      )}
+      {!isReady && (
+        <p className="mt-5 text-gray-500">
+          Loading conversion tools… please wait.
+        </p>
+      )}
     </div>
   );
 }
